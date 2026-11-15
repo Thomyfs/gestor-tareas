@@ -1,94 +1,128 @@
 import { useState } from 'react';
+import {
+  hashContrasena,
+  obtenerUsuarios,
+  guardarUsuarios,
+} from '../utils/almacenamiento';
 
-export default function Auth({ onLogin }) {
+export default function Autenticacion({ onLogin }) {
   const [registrando, setRegistrando] = useState(false);
   const [nombreUsuario, setNombreUsuario] = useState('');
   const [contrasena, setContrasena] = useState('');
   const [error, setError] = useState('');
+  const [exito, setExito] = useState('');
 
-  const handleSubmit = (e) => {
+  const cambiarModo = () => {
+    setRegistrando(!registrando);
+    setError('');
+    setNombreUsuario('');
+    setContrasena('');
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!nombreUsuario.trim() || !contrasena.trim()) {
+    const usuario = nombreUsuario.trim();
+    if (!usuario || !contrasena.trim()) {
       setError('Por favor completa todos los campos.');
       return;
     }
 
-    const usuarios = JSON.parse(localStorage.getItem('app_usuarios')) || [];
+    const usuarios = obtenerUsuarios();
+    const hash = await hashContrasena(contrasena);
 
     if (registrando) {
-      const userExists = usuarios.find((u) => u.nombreUsuario === nombreUsuario);
-      if (userExists) {
+      if (contrasena.length < 4) {
+        setError('La contraseña debe tener al menos 4 caracteres.');
+        return;
+      }
+      if (usuarios.some((u) => u.nombreUsuario.toLowerCase() === usuario.toLowerCase())) {
         setError('El usuario ya existe.');
         return;
       }
-      const usuarioNuevo = { nombreUsuario, contrasena };
-      usuarios.push(usuarioNuevo);
-      localStorage.setItem('app_usuarios', JSON.stringify(usuarios));
-      alert('¡Registro exitoso! Ahora inicia sesión.');
+      guardarUsuarios([...usuarios, { nombreUsuario: usuario, contrasena: hash }]);
       setRegistrando(false);
       setNombreUsuario('');
       setContrasena('');
       setError('');
+      setExito('¡Registro exitoso! Ahora inicia sesión.');
     } else {
-      const usuarioValido = usuarios.find(
-        (u) => u.nombreUsuario === nombreUsuario && u.contrasena === contrasena
+      const valido = usuarios.find(
+        (u) => u.nombreUsuario === usuario && u.contrasena === hash
       );
-      if (usuarioValido) {
-        onLogin(nombreUsuario);
+      if (valido) {
+        onLogin(valido.nombreUsuario);
       } else {
+        setExito('');
         setError('Usuario o contraseña incorrectos.');
       }
     }
   };
 
+  const input =
+    'w-full rounded-md border border-gray-300 p-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500';
+
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <h2 style={styles.title}>
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
+      <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-md">
+        <h1 className="text-2xl font-bold text-gray-800 text-center">📋 Gestor de Tareas</h1>
+        <h2 className="mt-1 mb-6 text-center text-gray-500">
           {registrando ? 'Crear una cuenta' : 'Iniciar sesión'}
         </h2>
 
-        {error && <div style={styles.error}>{error}</div>}
+        {error && (
+          <div role="alert" className="mb-4 p-3 rounded-md bg-red-100 text-red-800 text-sm text-center">
+            {error}
+          </div>
+        )}
+        {exito && (
+          <div role="status" className="mb-4 p-3 rounded-md bg-green-100 text-green-800 text-sm text-center">
+            {exito}
+          </div>
+        )}
 
-        <form onSubmit={handleSubmit} style={styles.form}>
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Usuario</label>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="usuario" className="block text-sm font-medium text-gray-600 mb-1">
+              Usuario
+            </label>
             <input
+              id="usuario"
               type="text"
               value={nombreUsuario}
               onChange={(e) => setNombreUsuario(e.target.value)}
-              style={styles.input}
+              className={input}
               placeholder="Ingresa tu usuario"
+              autoComplete="username"
             />
           </div>
-
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Contraseña</label>
+          <div>
+            <label htmlFor="contrasena" className="block text-sm font-medium text-gray-600 mb-1">
+              Contraseña
+            </label>
             <input
+              id="contrasena"
               type="password"
               value={contrasena}
               onChange={(e) => setContrasena(e.target.value)}
-              style={styles.input}
+              className={input}
               placeholder="Ingresa tu contraseña"
+              autoComplete={registrando ? 'new-password' : 'current-password'}
             />
           </div>
-
-          <button type="submit" style={styles.button}>
+          <button
+            type="submit"
+            className="w-full py-3 rounded-md bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors"
+          >
             {registrando ? 'Registrarse' : 'Entrar'}
           </button>
         </form>
 
-        <p style={styles.switchText}>
+        <p className="mt-6 text-center text-sm text-gray-500">
           {registrando ? '¿Ya tienes una cuenta?' : '¿No tienes una cuenta?'}
           <button
             type="button"
-            onClick={() => {
-              setRegistrando(!registrando);
-              setError('');
-              setNombreUsuario('');
-              setContrasena('');
-            }}
-            style={styles.switchButton}
+            onClick={cambiarModo}
+            className="ml-2 font-semibold text-indigo-600 hover:underline"
           >
             {registrando ? 'Inicia sesión' : 'Regístrate'}
           </button>
@@ -97,87 +131,3 @@ export default function Auth({ onLogin }) {
     </div>
   );
 }
-
-// Estilos básicos en línea para que luzca ordenado al instante
-const styles = {
-  container: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: '100vh',
-    backgroundColor: '#f3f4f6',
-    fontFamily: 'sans-serif',
-  },
-  card: {
-    background: '#ffffff',
-    padding: '2rem',
-    borderRadius: '8px',
-    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-    width: '100%',
-    maxWidth: '400px',
-  },
-  title: {
-    marginBottom: '1.5rem',
-    fontSize: '1.5rem',
-    color: '#1f2937',
-    textAlign: 'center',
-  },
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '1rem',
-  },
-  inputGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.5rem',
-  },
-  label: {
-    fontSize: '0.875rem',
-    fontWeight: '500',
-    color: '#4b5563',
-  },
-  input: {
-    padding: '0.75rem',
-    borderRadius: '4px',
-    border: '1px solid #d1d5db',
-    fontSize: '1rem',
-    outline: 'none',
-  },
-  button: {
-    marginTop: '0.5rem',
-    padding: '0.75rem',
-    backgroundColor: '#2563eb',
-    color: '#white',
-    border: 'none',
-    borderRadius: '4px',
-    fontSize: '1rem',
-    fontWeight: '600',
-    cursor: 'pointer',
-  },
-  error: {
-    marginBottom: '1rem',
-    padding: '0.75rem',
-    backgroundColor: '#fee2e2',
-    color: '#991b1b',
-    borderRadius: '4px',
-    fontSize: '0.875rem',
-    textAlign: 'center',
-  },
-  switchText: {
-    marginTop: '1.5rem',
-    textAlign: 'center',
-    fontSize: '0.875rem',
-    color: '#6b7280',
-  },
-  switchButton: {
-    background: 'none',
-    border: 'none',
-    color: '#2563eb',
-    fontWeight: '600',
-    cursor: 'pointer',
-    marginLeft: '0.5rem',
-    padding: 0,
-    fontSize: '0.875rem',
-  },
-};
